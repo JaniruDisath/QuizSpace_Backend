@@ -13,7 +13,6 @@ function normalizeParentFolderId(parentFolderId) {
   return parentFolderId;
 }
 
-// CREATE FOLDER
 export async function createFolder(req, res) {
   try {
     const { folderName, folderColor, parentFolderId, userEmail } = req.body;

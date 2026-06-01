@@ -4,11 +4,14 @@ import dotenv from "dotenv";
 import express from "express";
 import cors from "cors"
 
+import { connectDB } from "./config/db.js";
+
 import notesRoutes from "./routes/notesRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-import { connectDB } from "./config/db.js";
 import rateLimiter from "../middleware/rateLimiter.js";
 import folderRoutes from "./routes/folderRoutes.js";
+import quizRoutes from "./routes/quizRoutes.js";
+import quizScoreRoutes from "./routes/quizScoreRoutes.js";
 
 
 dotenv.config();
@@ -30,7 +33,8 @@ app.use(cors())
 app.use("/api/notes", notesRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/folders", folderRoutes);
-
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/quiz-scores", quizScoreRoutes);
 
 //First connect with the database, if the connection successfull, the application will start
 connectDB().then(() => {
