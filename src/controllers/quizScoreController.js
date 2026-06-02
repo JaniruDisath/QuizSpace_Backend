@@ -120,3 +120,18 @@ export async function deleteQuizScore(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
+export async function getQuizScoreById(req, res) {
+  try {
+    const quizScore = await QuizScore.findById(req.params.id);
+
+    if (!quizScore) {
+      return res.status(404).json({ message: "Quiz score not found" });
+    }
+
+    res.status(200).json(quizScore);
+  } catch (error) {
+    console.error("Error in getQuizScoreById controller", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}

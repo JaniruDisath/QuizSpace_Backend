@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   saveQuizScore,
+  getQuizScoreById,
   getScoresByQuiz,
   getScoresByQuizAndUser,
   getQuizScoreSummary,
@@ -17,6 +18,8 @@ router.get("/quiz/:quizId", getScoresByQuiz);
 router.get("/quiz/:quizId/user/:userEmail", getScoresByQuizAndUser);
 
 router.get("/summary/:quizId/user/:userEmail", getQuizScoreSummary);
+
+router.get("/:id", getQuizScoreById);
 
 router.delete("/:id", deleteQuizScore);
 
