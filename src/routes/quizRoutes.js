@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   getAllQuizzes,
+  getQuizzesByFolder,
   getQuizById,
   createQuiz,
   updateQuiz,
@@ -11,6 +12,8 @@ import {
 const router = express.Router();
 
 router.get("/", getAllQuizzes);
+
+router.get("/by-folder", getQuizzesByFolder);
 
 router.get("/:id", getQuizById);
 

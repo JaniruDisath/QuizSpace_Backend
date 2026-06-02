@@ -4,19 +4,19 @@ const optionSchema = new mongoose.Schema(
   {
     text: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const questionSchema = new mongoose.Schema(
   {
     questionText: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
 
     options: {
@@ -34,31 +34,33 @@ const questionSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+      default: 0,
       validate: {
         validator: function (value) {
           return (
             Array.isArray(this.options) &&
+            this.options.length > 0 &&
             value >= 0 &&
             value < this.options.length
           );
         },
-        message: "Correct option index must match one of the available options.",
+        message:
+          "Correct option index must match one of the available options.",
       },
     },
 
-    focusArea: {
+    explanation: {
       type: String,
       trim: true,
       default: "",
     },
 
-    explanation: {
-      type: String,
-      required: true,
-      trim: true,
+    isLocked: {
+      type: Boolean,
+      default: false,
     },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const quizSchema = new mongoose.Schema(
@@ -81,12 +83,18 @@ const quizSchema = new mongoose.Schema(
       default: null,
     },
 
+    userEmail: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     questions: {
       type: [questionSchema],
       default: [],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model("Quiz", quizSchema);

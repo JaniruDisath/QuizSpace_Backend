@@ -13,7 +13,16 @@ export async function getAllQuizzes(req, res) {
 
 export async function getQuizById(req, res) {
   try {
-    const quiz = await Quiz.findById(req.params.id);
+    const { userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
+    const quiz = await Quiz.findOne({
+      _id: req.params.id,
+      userEmail: userEmail,
+    });
 
     if (!quiz) {
       return res.status(404).json({ message: "Quiz not found" });
@@ -28,12 +37,17 @@ export async function getQuizById(req, res) {
 
 export async function createQuiz(req, res) {
   try {
-    const { title, description, folderId, questions } = req.body;
+    const { title, description, folderId, questions, userEmail } = req.body;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
 
     const newQuiz = new Quiz({
       title,
       description,
       folderId: folderId || null,
+      userEmail,
       questions: questions || [],
     });
 
@@ -41,6 +55,7 @@ export async function createQuiz(req, res) {
 
     res.status(201).json({
       message: "Quiz created successfully",
+      quiz: newQuiz,
     });
   } catch (error) {
     console.error("Error in createQuiz controller", error);
@@ -55,10 +70,19 @@ export async function createQuiz(req, res) {
 
 export async function updateQuiz(req, res) {
   try {
+    const { userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
     const { title, description, folderId, questions } = req.body;
 
-    const updatedQuiz = await Quiz.findByIdAndUpdate(
-      req.params.id,
+    const updatedQuiz = await Quiz.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userEmail: userEmail,
+      },
       {
         title,
         description,
@@ -68,7 +92,7 @@ export async function updateQuiz(req, res) {
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
 
     if (!updatedQuiz) {
@@ -92,7 +116,16 @@ export async function updateQuiz(req, res) {
 
 export async function deleteQuiz(req, res) {
   try {
-    const deletedQuiz = await Quiz.findByIdAndDelete(req.params.id);
+    const { userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
+    const deletedQuiz = await Quiz.findOneAndDelete({
+      _id: req.params.id,
+      userEmail: userEmail,
+    });
 
     if (!deletedQuiz) {
       return res.status(404).json({ message: "Quiz not found" });
@@ -101,6 +134,28 @@ export async function deleteQuiz(req, res) {
     res.status(200).json({ message: "Quiz deleted successfully" });
   } catch (error) {
     console.error("Error in deleteQuiz controller", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function getQuizzesByFolder(req, res) {
+  try {
+    const { folderId, userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
+    const query = {
+      userEmail: userEmail,
+      folderId: !folderId || folderId === "null" ? null : folderId,
+    };
+
+    const quizzes = await Quiz.find(query).sort({ createdAt: -1 });
+
+    res.status(200).json(quizzes);
+  } catch (error) {
+    console.error("Error in getQuizzesByFolder controller", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
