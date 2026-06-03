@@ -1,16 +1,53 @@
 import QuizScore from "../models/QuizScore.js";
+import Quiz from "../models/Quiz.js";
 
 export async function saveQuizScore(req, res) {
   try {
-    const { quizId, userEmail, score, totalQuestions, answers } = req.body;
+    const { quizId, userEmail, answers } = req.body;
 
-    if (!quizId || !userEmail || score === undefined || !totalQuestions) {
+    if (!quizId || !userEmail || !Array.isArray(answers)) {
       return res.status(400).json({
-        message: "quizId, userEmail, score, and totalQuestions are required",
+        message: "quizId, userEmail, and answers are required",
       });
     }
 
-    const percentage = Math.round((score / totalQuestions) * 100);
+    const quiz = await Quiz.findOne({
+      _id: quizId,
+      userEmail,
+    });
+
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found for this user",
+      });
+    }
+
+    let score = 0;
+
+    const cleanAnswers = quiz.questions.map((question) => {
+      const submittedAnswer = answers.find((answer) => {
+        return answer.questionId?.toString() === question._id.toString();
+      });
+
+      const selectedOptionIndex = submittedAnswer?.selectedOptionIndex;
+
+      const isCorrect = selectedOptionIndex === question.correctOptionIndex;
+
+      if (isCorrect) {
+        score++;
+      }
+
+      return {
+        questionId: question._id,
+        selectedOptionIndex,
+        correctOptionIndex: question.correctOptionIndex,
+        isCorrect,
+      };
+    });
+
+    const totalQuestions = quiz.questions.length;
+    const percentage =
+      totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
 
     const newQuizScore = new QuizScore({
       quizId,
@@ -18,7 +55,7 @@ export async function saveQuizScore(req, res) {
       score,
       totalQuestions,
       percentage,
-      answers: answers || [],
+      answers: cleanAnswers,
     });
 
     await newQuizScore.save();
@@ -35,8 +72,15 @@ export async function saveQuizScore(req, res) {
 
 export async function getScoresByQuiz(req, res) {
   try {
+    const { userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
     const scores = await QuizScore.find({
       quizId: req.params.quizId,
+      userEmail,
     }).sort({ createdAt: -1 });
 
     res.status(200).json(scores);
@@ -49,6 +93,12 @@ export async function getScoresByQuiz(req, res) {
 export async function getScoresByQuizAndUser(req, res) {
   try {
     const { quizId, userEmail } = req.params;
+
+    if (!quizId || !userEmail) {
+      return res.status(400).json({
+        message: "quizId and userEmail are required",
+      });
+    }
 
     const scores = await QuizScore.find({
       quizId,
@@ -65,6 +115,12 @@ export async function getScoresByQuizAndUser(req, res) {
 export async function getQuizScoreSummary(req, res) {
   try {
     const { quizId, userEmail } = req.params;
+
+    if (!quizId || !userEmail) {
+      return res.status(400).json({
+        message: "quizId and userEmail are required",
+      });
+    }
 
     const scores = await QuizScore.find({
       quizId,
@@ -87,10 +143,9 @@ export async function getQuizScoreSummary(req, res) {
     }, 0);
 
     const averageScore = Math.round(totalPercentage / attempts);
-
     const bestScore = Math.max(...scores.map((item) => item.percentage));
 
-    const latestScore = scores.sort((a, b) => {
+    const latestScore = [...scores].sort((a, b) => {
       return new Date(b.createdAt) - new Date(a.createdAt);
     })[0].percentage;
 
@@ -108,7 +163,16 @@ export async function getQuizScoreSummary(req, res) {
 
 export async function deleteQuizScore(req, res) {
   try {
-    const deletedScore = await QuizScore.findByIdAndDelete(req.params.id);
+    const { userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
+    const deletedScore = await QuizScore.findOneAndDelete({
+      _id: req.params.id,
+      userEmail,
+    });
 
     if (!deletedScore) {
       return res.status(404).json({ message: "Quiz score not found" });
@@ -123,7 +187,16 @@ export async function deleteQuizScore(req, res) {
 
 export async function getQuizScoreById(req, res) {
   try {
-    const quizScore = await QuizScore.findById(req.params.id);
+    const { userEmail } = req.query;
+
+    if (!userEmail) {
+      return res.status(400).json({ message: "User email is required" });
+    }
+
+    const quizScore = await QuizScore.findOne({
+      _id: req.params.id,
+      userEmail,
+    });
 
     if (!quizScore) {
       return res.status(404).json({ message: "Quiz score not found" });

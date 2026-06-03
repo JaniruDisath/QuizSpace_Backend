@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Folder from "../models/Folder.js";
+import Quiz from "../models/Quiz.js";
 
 function normalizeParentFolderId(parentFolderId) {
   if (
@@ -108,7 +109,7 @@ export async function renameFolder(req, res) {
       {
         folderName,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedFolder) {
@@ -141,46 +142,70 @@ async function collectFolderAndChildren(folderId, userEmail, idsToDelete = []) {
 }
 
 // DELETE FOLDER AND ITS CHILD FOLDERS
+async function getDescendantFolderIds(parentFolderId, userEmail) {
+  const childFolders = await Folder.find({
+    parentFolderId,
+    userEmail,
+  });
+
+  let folderIds = childFolders.map((folder) => folder._id);
+
+  for (const childFolder of childFolders) {
+    const descendantIds = await getDescendantFolderIds(
+      childFolder._id,
+      userEmail,
+    );
+
+    folderIds = [...folderIds, ...descendantIds];
+  }
+
+  return folderIds;
+}
+
 export async function deleteFolder(req, res) {
   try {
-    const { id } = req.params;
     const { userEmail } = req.query;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        message: "Invalid folder ID.",
-      });
-    }
-
     if (!userEmail) {
-      return res.status(400).json({
-        message: "User email is required.",
-      });
+      return res.status(400).json({ message: "User email is required" });
     }
 
     const folder = await Folder.findOne({
-      _id: id,
+      _id: req.params.id,
       userEmail,
     });
 
     if (!folder) {
-      return res.status(404).json({
-        message: "Folder not found.",
-      });
+      return res.status(404).json({ message: "Folder not found" });
     }
 
-    const idsToDelete = await collectFolderAndChildren(id, userEmail);
+    const descendantFolderIds = await getDescendantFolderIds(
+      folder._id,
+      userEmail,
+    );
+
+    const folderIdsToDelete = [folder._id, ...descendantFolderIds];
+
+    await Quiz.deleteMany({
+      userEmail,
+      folderId: {
+        $in: folderIdsToDelete,
+      },
+    });
 
     await Folder.deleteMany({
-      _id: { $in: idsToDelete },
       userEmail,
+      _id: {
+        $in: folderIdsToDelete,
+      },
     });
 
     res.status(200).json({
-      message: "Folder and child folders deleted successfully.",
+      message:
+        "Folder, child folders, and related quizzes deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting folder:", error);
+    console.error("Error in deleteFolder controller", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

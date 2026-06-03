@@ -6,18 +6,18 @@ import cors from "cors"
 
 import { connectDB } from "./config/db.js";
 
-import notesRoutes from "./routes/notesRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
+import userRoutes from "./modules/users/routes/userRoutes.js";
 import rateLimiter from "../middleware/rateLimiter.js";
-import folderRoutes from "./routes/folderRoutes.js";
-import quizRoutes from "./routes/quizRoutes.js";
-import quizScoreRoutes from "./routes/quizScoreRoutes.js";
+import folderRoutes from "./modules/workspace/routes/folderRoutes.js";
+import quizRoutes from "./modules/workspace/routes/quizRoutes.js";
+import quizScoreRoutes from "./modules/workspace/routes/quizScoreRoutes.js";
 
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+
 
 //Middleware
 app.use(express.json()); // This Middleware will parse JSON bodies: req.body
@@ -30,7 +30,6 @@ app.use(cors())
 //   next();
 // })
 
-app.use("/api/notes", notesRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/folders", folderRoutes);
 app.use("/api/quizzes", quizRoutes);

@@ -77,6 +77,12 @@ const quizSchema = new mongoose.Schema(
       default: "",
     },
 
+    quizColor: {
+      type: String,
+      trim: true,
+      default: "success",
+    },
+
     folderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Folder",
