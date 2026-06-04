@@ -21,10 +21,31 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    publicStats: {
+      totalPoints: {
+        type: Number,
+        default: 0,
+      },
+
+      publicQuizzesAttempted: {
+        type: Number,
+        default: 0,
+      },
+
+      publicQuizzesPublished: {
+        type: Number,
+        default: 0,
+      },
+
+      publicQuestionsPublished: {
+        type: Number,
+        default: 0,
+      },
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 const User = mongoose.model("User", userSchema, "users");

@@ -12,6 +12,11 @@ import folderRoutes from "./modules/workspace/routes/folderRoutes.js";
 import quizRoutes from "./modules/workspace/routes/quizRoutes.js";
 import quizScoreRoutes from "./modules/workspace/routes/quizScoreRoutes.js";
 
+import publicQuizRoutes from "./modules/explore/routes/publicQuizRoutes.js";
+import publicQuizAttemptRoutes from "./modules/explore/routes/publicQuizAttemptRoutes.js";
+import leaderboardRoutes from "./modules/explore/routes/leaderboardRoutes.js";
+import publicCategoryRoutes from "./modules/explore/routes/publicCategoryRoutes.js";
+
 
 dotenv.config();
 
@@ -21,6 +26,13 @@ const PORT = process.env.PORT || 5001;
 
 //Middleware
 app.use(express.json()); // This Middleware will parse JSON bodies: req.body
+
+app.use((req, res, next) => {
+  console.log("REQUEST:", req.method, req.originalUrl);
+  next();
+});
+
+
 app.use(rateLimiter);
 app.use(cors())
 
@@ -34,6 +46,11 @@ app.use("/api/user", userRoutes);
 app.use("/api/folders", folderRoutes);
 app.use("/api/quizzes", quizRoutes);
 app.use("/api/quiz-scores", quizScoreRoutes);
+
+app.use("/api/explore/quizzes", publicQuizRoutes);
+app.use("/api/explore/attempts", publicQuizAttemptRoutes);
+app.use("/api/explore/leaderboard", leaderboardRoutes);
+app.use("/api/explore/categories", publicCategoryRoutes);
 
 //First connect with the database, if the connection successfull, the application will start
 connectDB().then(() => {
