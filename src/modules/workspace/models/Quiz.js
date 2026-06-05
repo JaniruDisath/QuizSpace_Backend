@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const optionSchema = new mongoose.Schema(
+const publicOptionSchema = new mongoose.Schema(
   {
     text: {
       type: String,
@@ -11,7 +11,7 @@ const optionSchema = new mongoose.Schema(
   { _id: true },
 );
 
-const questionSchema = new mongoose.Schema(
+const publicQuestionSchema = new mongoose.Schema(
   {
     questionText: {
       type: String,
@@ -20,33 +20,20 @@ const questionSchema = new mongoose.Schema(
     },
 
     options: {
-      type: [optionSchema],
-      required: true,
-      validate: {
-        validator: function (options) {
-          return Array.isArray(options) && options.length >= 2;
-        },
-        message: "Each question must have at least 2 answer options.",
-      },
+      type: [publicOptionSchema],
+      default: [],
     },
 
     correctOptionIndex: {
       type: Number,
-      required: true,
-      min: 0,
       default: 0,
-      validate: {
-        validator: function (value) {
-          return (
-            Array.isArray(this.options) &&
-            this.options.length > 0 &&
-            value >= 0 &&
-            value < this.options.length
-          );
-        },
-        message:
-          "Correct option index must match one of the available options.",
-      },
+      min: 0,
+    },
+
+    focusArea: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     explanation: {
@@ -63,8 +50,15 @@ const questionSchema = new mongoose.Schema(
   { _id: true },
 );
 
-const quizSchema = new mongoose.Schema(
+const publicQuizSchema = new mongoose.Schema(
   {
+    seedKey: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
+
     title: {
       type: String,
       required: true,
@@ -77,30 +71,88 @@ const quizSchema = new mongoose.Schema(
       default: "",
     },
 
-    quizColor: {
+    categoryName: {
       type: String,
+      required: true,
       trim: true,
-      default: "success",
+      default: "General Knowledge",
     },
 
-    folderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Folder",
-      default: null,
+    difficulty: {
+      type: String,
+      enum: ["Beginner", "Intermediate", "Advanced"],
+      default: "Beginner",
     },
 
-    userEmail: {
+    authorEmail: {
       type: String,
       required: true,
       trim: true,
     },
 
+    authorName: {
+      type: String,
+      trim: true,
+      default: "QuizSpace User",
+    },
+
+    sourcePrivateQuizId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Quiz",
+      default: null,
+    },
+
     questions: {
-      type: [questionSchema],
+      type: [publicQuestionSchema],
       default: [],
+    },
+
+    pointsPerQuestion: {
+      type: Number,
+      default: 10,
+      min: 1,
+    },
+
+    status: {
+      type: String,
+      enum: ["published", "hidden"],
+      default: "hidden",
+    },
+
+    publishedAt: {
+      type: Date,
+      default: null,
+    },
+
+    attemptCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    participantCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    averagePercentage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+
+    averagePoints: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   { timestamps: true },
 );
 
-export default mongoose.model("Quiz", quizSchema);
+publicQuizSchema.index({ authorEmail: 1, status: 1 });
+publicQuizSchema.index({ categoryName: 1, difficulty: 1, status: 1 });
+
+export default mongoose.model("PublicQuiz", publicQuizSchema);

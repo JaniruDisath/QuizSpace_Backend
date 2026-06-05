@@ -17,6 +17,9 @@ import publicQuizAttemptRoutes from "./modules/explore/routes/publicQuizAttemptR
 import leaderboardRoutes from "./modules/explore/routes/leaderboardRoutes.js";
 import publicCategoryRoutes from "./modules/explore/routes/publicCategoryRoutes.js";
 
+import devSeedRoutes from "./modules/devSeed/routes/devSeedRoutes.js";
+import publicCreatorRoutes from "./modules/explore/routes/publicCreatorRoutes.js";
+
 
 dotenv.config();
 
@@ -25,7 +28,8 @@ const PORT = process.env.PORT || 5001;
 
 
 //Middleware
-app.use(express.json()); // This Middleware will parse JSON bodies: req.body
+// app.use(express.json()); // This Middleware will parse JSON bodies: req.body
+app.use(express.json({ limit: "2mb" })); // Same thing with size limitter. GIves 413 for requests with json over 2mb
 
 app.use((req, res, next) => {
   console.log("REQUEST:", req.method, req.originalUrl);
@@ -51,6 +55,9 @@ app.use("/api/explore/quizzes", publicQuizRoutes);
 app.use("/api/explore/attempts", publicQuizAttemptRoutes);
 app.use("/api/explore/leaderboard", leaderboardRoutes);
 app.use("/api/explore/categories", publicCategoryRoutes);
+
+app.use("/api/dev-seed", devSeedRoutes);
+app.use("/api/explore/creator", publicCreatorRoutes);
 
 //First connect with the database, if the connection successfull, the application will start
 connectDB().then(() => {

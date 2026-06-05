@@ -4,6 +4,8 @@ import PublicQuiz from "../models/PublicQuiz.js";
 import PublicQuizAttempt from "../models/PublicQuizAttempt.js";
 import User from "../../../modules/users/models/User.js";
 
+import PublicQuizAttemptEvent from "../models/PublicQuizAttemptEvent.js";
+
 async function recalculatePublicQuizStats(publicQuizId) {
   const attempts = await PublicQuizAttempt.find({ publicQuizId });
 
@@ -58,17 +60,18 @@ function isNewResultBetter(newResult, existingAttempt) {
 
 export async function submitPublicQuizAttempt(req, res) {
   try {
-    const { publicQuizId, userEmail, selectedAnswers, durationSeconds } =
-      req.body;
+    const {
+      publicQuizId,
+      userEmail,
+      selectedAnswers,
+      durationSeconds,
+      timeTakenSeconds,
+    } = req.body;
 
     if (!publicQuizId || !userEmail || !selectedAnswers) {
       return res.status(400).json({
         message: "publicQuizId, userEmail, and selectedAnswers are required",
       });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(publicQuizId)) {
-      return res.status(400).json({ message: "Invalid public quiz id" });
     }
 
     const publicQuiz = await PublicQuiz.findById(publicQuizId);
@@ -77,23 +80,24 @@ export async function submitPublicQuizAttempt(req, res) {
       return res.status(404).json({ message: "Public quiz not found" });
     }
 
+    const totalQuestions = publicQuiz.questions.length;
+
+    if (totalQuestions === 0) {
+      return res.status(400).json({
+        message: "This public quiz has no questions.",
+      });
+    }
+
     const user = await User.findOne({ email: userEmail });
 
     let score = 0;
-    const answers = [];
 
-    for (const question of publicQuiz.questions) {
-      const selectedOptionIndex = selectedAnswers[question._id.toString()];
+    const answers = publicQuiz.questions.map((question) => {
+      const selectedValue = selectedAnswers[question._id.toString()];
+      const selectedOptionIndex = Number(selectedValue);
 
-      if (
-        selectedOptionIndex === undefined ||
-        selectedOptionIndex === null ||
-        selectedOptionIndex < 0 ||
-        selectedOptionIndex >= question.options.length
-      ) {
-        return res.status(400).json({
-          message: "All questions must be answered before submitting.",
-        });
+      if (!Number.isInteger(selectedOptionIndex)) {
+        throw new Error(`Missing answer for question ${question._id}`);
       }
 
       const isCorrect = selectedOptionIndex === question.correctOptionIndex;
@@ -103,22 +107,26 @@ export async function submitPublicQuizAttempt(req, res) {
         score++;
       }
 
-      answers.push({
+      return {
         questionId: question._id,
         selectedOptionIndex,
         correctOptionIndex: question.correctOptionIndex,
         isCorrect,
         pointsEarned,
-      });
-    }
+      };
+    });
 
-    const totalQuestions = publicQuiz.questions.length;
     const percentage = Math.round((score / totalQuestions) * 100);
     const pointsEarned = score * publicQuiz.pointsPerQuestion;
 
-    const safeDurationSeconds = Math.max(1, Number(durationSeconds) || 1);
+    const safeDurationSeconds = Math.max(
+      Number(durationSeconds || timeTakenSeconds || 1),
+      1,
+    );
 
-    const newResult = {
+    await PublicQuizAttemptEvent.create({
+      publicQuizId,
+      userEmail,
       userName: user?.fullName || "QuizSpace User",
       score,
       totalQuestions,
@@ -126,7 +134,8 @@ export async function submitPublicQuizAttempt(req, res) {
       pointsEarned,
       durationSeconds: safeDurationSeconds,
       answers,
-    };
+      attemptedAt: new Date(),
+    });
 
     const existingAttempt = await PublicQuizAttempt.findOne({
       publicQuizId,
@@ -134,91 +143,98 @@ export async function submitPublicQuizAttempt(req, res) {
     });
 
     let savedAttempt;
-    let pointsDifference = 0;
-    let wasBestUpdated = false;
 
     if (!existingAttempt) {
-      savedAttempt = new PublicQuizAttempt({
+      savedAttempt = await PublicQuizAttempt.create({
         publicQuizId,
         userEmail,
-        userName: newResult.userName,
-        score: newResult.score,
-        totalQuestions: newResult.totalQuestions,
-        percentage: newResult.percentage,
-        pointsEarned: newResult.pointsEarned,
-        durationSeconds: newResult.durationSeconds,
+        userName: user?.fullName || "QuizSpace User",
+        score,
+        totalQuestions,
+        percentage,
+        pointsEarned,
+        durationSeconds: safeDurationSeconds,
+        totalDurationSeconds: safeDurationSeconds,
         attemptCount: 1,
-        answers: newResult.answers,
-        bestAttemptAt: new Date(),
         lastAttemptAt: new Date(),
+        answers,
       });
-
-      await savedAttempt.save();
-
-      pointsDifference = newResult.pointsEarned;
-      wasBestUpdated = true;
     } else {
-      existingAttempt.attemptCount += 1;
+      const currentBestDuration = Number(
+        existingAttempt.durationSeconds || existingAttempt.totalDurationSeconds || 999999,
+      );
+
+      const isBetterScore = score > existingAttempt.score;
+      const isEqualScoreButFaster =
+        score === existingAttempt.score && safeDurationSeconds < currentBestDuration;
+
+      existingAttempt.attemptCount = (existingAttempt.attemptCount || 1) + 1;
+      existingAttempt.totalDurationSeconds =
+        (existingAttempt.totalDurationSeconds || 0) + safeDurationSeconds;
       existingAttempt.lastAttemptAt = new Date();
-      existingAttempt.userName = newResult.userName;
 
-      if (isNewResultBetter(newResult, existingAttempt)) {
-        pointsDifference =
-          newResult.pointsEarned - existingAttempt.pointsEarned;
-
-        existingAttempt.score = newResult.score;
-        existingAttempt.totalQuestions = newResult.totalQuestions;
-        existingAttempt.percentage = newResult.percentage;
-        existingAttempt.pointsEarned = newResult.pointsEarned;
-        existingAttempt.durationSeconds = newResult.durationSeconds;
-        existingAttempt.answers = newResult.answers;
-        existingAttempt.bestAttemptAt = new Date();
-
-        wasBestUpdated = true;
+      if (isBetterScore || isEqualScoreButFaster) {
+        existingAttempt.score = score;
+        existingAttempt.totalQuestions = totalQuestions;
+        existingAttempt.percentage = percentage;
+        existingAttempt.pointsEarned = pointsEarned;
+        existingAttempt.durationSeconds = safeDurationSeconds;
+        existingAttempt.answers = answers;
       }
 
       savedAttempt = await existingAttempt.save();
     }
 
-    await recalculatePublicQuizStats(publicQuizId);
+    const allQuizEvents = await PublicQuizAttemptEvent.find({ publicQuizId });
 
-    if (pointsDifference !== 0 || !existingAttempt) {
-      await User.findOneAndUpdate(
-        { email: userEmail },
-        {
-          $inc: {
-            "publicStats.totalPoints": pointsDifference,
-          },
-        },
-      );
-    }
+    const newAttemptCount = allQuizEvents.length;
+
+    const participantCount = new Set(
+      allQuizEvents.map((event) => event.userEmail),
+    ).size;
+
+    const averagePercentage = Math.round(
+      allQuizEvents.reduce((sum, event) => sum + (event.percentage || 0), 0) /
+        newAttemptCount,
+    );
+
+    const averagePoints = Math.round(
+      allQuizEvents.reduce((sum, event) => sum + (event.pointsEarned || 0), 0) /
+        newAttemptCount,
+    );
+
+    await PublicQuiz.findByIdAndUpdate(publicQuizId, {
+      attemptCount: newAttemptCount,
+      participantCount,
+      averagePercentage,
+      averagePoints,
+    });
 
     await User.findOneAndUpdate(
       { email: userEmail },
       {
         $inc: {
+          "publicStats.totalPoints": pointsEarned,
           "publicStats.publicQuizzesAttempted": 1,
+          "publicStats.totalTimeSpentSeconds": safeDurationSeconds,
         },
       },
     );
 
-    res.status(existingAttempt ? 200 : 201).json({
-      message: wasBestUpdated
-        ? "Public quiz attempt saved as best result"
-        : "Attempt recorded, but previous best result was kept",
+    return res.status(201).json({
+      message: "Public quiz attempt saved successfully",
       attempt: savedAttempt,
-      wasBestUpdated,
     });
   } catch (error) {
     console.error("Error in submitPublicQuizAttempt controller", error);
 
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message: "Duplicate attempt conflict. Please submit again.",
+    if (error.message?.startsWith("Missing answer")) {
+      return res.status(400).json({
+        message: error.message,
       });
     }
 
-    res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 

@@ -1,29 +1,91 @@
-import User from "../../../modules/users/models/User.js";
 import PublicQuizAttempt from "../models/PublicQuizAttempt.js";
 
 export async function getGlobalLeaderboard(req, res) {
   try {
-    const users = await User.find({
-      "publicStats.totalPoints": { $gt: 0 },
-    })
-      .sort({ "publicStats.totalPoints": -1 })
-      .limit(50);
+    const leaderboard = await PublicQuizAttempt.aggregate([
+      {
+        $group: {
+          _id: "$userEmail",
 
-    const leaderboard = users.map((user, index) => ({
+          userEmail: {
+            $first: "$userEmail",
+          },
+
+          userName: {
+            $first: "$userName",
+          },
+
+          totalPoints: {
+            $sum: "$pointsEarned",
+          },
+
+          totalAttempts: {
+            $sum: {
+              $ifNull: ["$attemptCount", 1],
+            },
+          },
+
+          totalDurationSeconds: {
+            $sum: {
+              $ifNull: [
+                "$totalDurationSeconds",
+                {
+                  $multiply: [
+                    {
+                      $ifNull: ["$durationSeconds", 0],
+                    },
+                    {
+                      $ifNull: ["$attemptCount", 1],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+
+          quizzesPlayed: {
+            $sum: 1,
+          },
+
+          lastPlayedAt: {
+            $max: {
+              $ifNull: ["$lastAttemptAt", "$updatedAt"],
+            },
+          },
+        },
+      },
+
+      {
+        $sort: {
+          totalPoints: -1,
+          totalAttempts: -1,
+          totalDurationSeconds: 1,
+        },
+      },
+
+      {
+        $limit: 50,
+      },
+    ]);
+
+    const rankedLeaderboard = leaderboard.map((leader, index) => ({
       rank: index + 1,
-      userEmail: user.email,
-      userName: user.fullName,
-      totalPoints: user.publicStats?.totalPoints || 0,
-      publicQuizzesAttempted: user.publicStats?.publicQuizzesAttempted || 0,
-      publicQuizzesPublished: user.publicStats?.publicQuizzesPublished || 0,
+      userEmail: leader.userEmail,
+      userName: leader.userName,
+      totalPoints: leader.totalPoints || 0,
+      totalAttempts: leader.totalAttempts || 0,
+      totalDurationSeconds: leader.totalDurationSeconds || 0,
+      quizzesPlayed: leader.quizzesPlayed || 0,
+      lastPlayedAt: leader.lastPlayedAt,
     }));
 
-    res.status(200).json(leaderboard);
+    res.status(200).json(rankedLeaderboard);
   } catch (error) {
     console.error("Error in getGlobalLeaderboard controller", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
 export async function getQuizLeaderboard(req, res) {
   try {
     const attempts = await PublicQuizAttempt.find({

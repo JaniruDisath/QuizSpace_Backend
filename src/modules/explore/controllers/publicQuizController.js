@@ -3,6 +3,8 @@ import PublicQuizAttempt from "../models/PublicQuizAttempt.js";
 import Quiz from "../../workspace/models/Quiz.js";
 import User from "../../../modules/users/models/User.js";
 
+import PublicCategory from "../models/PublicCategory.js";
+
 function validatePublicQuizData(quizData) {
   if (!quizData.title || quizData.title.trim() === "") {
     return "Public quiz title is required.";
@@ -63,32 +65,78 @@ function buildCleanQuestions(questions) {
 
 export async function getPublicQuizzes(req, res) {
   try {
-    const { search, categoryName, difficulty, status } = req.query;
+    const { search = "", categoryName = "All", difficulty = "All" } = req.query;
 
     const query = {
-      status: status || "published",
+      status: "published",
     };
 
-    if (categoryName && categoryName !== "All") {
+    if (categoryName !== "All") {
       query.categoryName = categoryName;
     }
 
-    if (difficulty && difficulty !== "All") {
+    if (difficulty !== "All") {
       query.difficulty = difficulty;
     }
 
-    if (search && search.trim() !== "") {
+    if (search.trim()) {
       query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { categoryName: { $regex: search, $options: "i" } },
-        { authorName: { $regex: search, $options: "i" } },
+        { title: { $regex: search.trim(), $options: "i" } },
+        { description: { $regex: search.trim(), $options: "i" } },
+        { authorName: { $regex: search.trim(), $options: "i" } },
+        { categoryName: { $regex: search.trim(), $options: "i" } },
       ];
     }
 
-    const quizzes = await PublicQuiz.find(query).sort({ createdAt: -1 });
+    const publicQuizzes = await PublicQuiz.find(query).sort({
+      createdAt: -1,
+    });
 
-    res.status(200).json(quizzes);
+    const categories = await PublicCategory.find({ isActive: true });
+
+    console.log(
+      "CATEGORY IMAGE CHECK:",
+      categories.map((category) => ({
+        categoryName: category.categoryName,
+        imageUrl: category.imageUrl,
+      })),
+    );
+
+    const categoryMap = new Map(
+      categories.map((category) => [
+        category.categoryName,
+        {
+          imageUrl: category.imageUrl || "",
+          imageAlt: category.imageAlt || "",
+          imageCreditUrl: category.imageCreditUrl || "",
+          icon: category.icon || "bi-grid",
+          color: category.color || "primary",
+        },
+      ]),
+    );
+
+    const enrichedQuizzes = publicQuizzes.map((quiz) => {
+      const quizObject = quiz.toObject();
+      const category = categoryMap.get(quiz.categoryName);
+
+      return {
+        ...quizObject,
+        categoryImageUrl: category?.imageUrl || "",
+        categoryImageAlt:
+          category?.imageAlt || `${quiz.categoryName} quiz image`,
+        categoryImageCreditUrl: category?.imageCreditUrl || "",
+        categoryIcon: category?.icon || "bi-grid",
+        categoryColor: category?.color || "primary",
+      };
+    });
+
+    res.status(200).json(enrichedQuizzes);
+
+    console.log("FIRST ENRICHED QUIZ IMAGE:", {
+      title: enrichedQuizzes[0]?.title,
+      categoryName: enrichedQuizzes[0]?.categoryName,
+      categoryImageUrl: enrichedQuizzes[0]?.categoryImageUrl,
+    });
   } catch (error) {
     console.error("Error in getPublicQuizzes controller", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -107,10 +155,40 @@ export async function getMyPublicQuizzes(req, res) {
       authorEmail: userEmail,
     }).sort({ createdAt: -1 });
 
-    res.status(200).json(quizzes);
+    const categories = await PublicCategory.find({ isActive: true });
+
+    const categoryMap = new Map(
+      categories.map((category) => [
+        category.categoryName,
+        {
+          imageUrl: category.imageUrl || "",
+          imageAlt: category.imageAlt || "",
+          imageCreditUrl: category.imageCreditUrl || "",
+          icon: category.icon || "bi-grid",
+          color: category.color || "primary",
+        },
+      ]),
+    );
+
+    const enrichedQuizzes = quizzes.map((quiz) => {
+      const quizObject = quiz.toObject();
+      const category = categoryMap.get(quiz.categoryName);
+
+      return {
+        ...quizObject,
+        categoryImageUrl: category?.imageUrl || "",
+        categoryImageAlt:
+          category?.imageAlt || `${quiz.categoryName} quiz image`,
+        categoryImageCreditUrl: category?.imageCreditUrl || "",
+        categoryIcon: category?.icon || "bi-grid",
+        categoryColor: category?.color || "primary",
+      };
+    });
+
+    return res.status(200).json(enrichedQuizzes);
   } catch (error) {
     console.error("Error in getMyPublicQuizzes controller", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
@@ -130,10 +208,24 @@ export async function getPublicQuizById(req, res) {
       }
     }
 
-    res.status(200).json(quiz);
+    const category = await PublicCategory.findOne({
+      categoryName: quiz.categoryName,
+      isActive: true,
+    });
+
+    const quizObject = quiz.toObject();
+
+    return res.status(200).json({
+      ...quizObject,
+      categoryImageUrl: category?.imageUrl || "",
+      categoryImageAlt: category?.imageAlt || `${quiz.categoryName} quiz image`,
+      categoryImageCreditUrl: category?.imageCreditUrl || "",
+      categoryIcon: category?.icon || "bi-grid",
+      categoryColor: category?.color || "primary",
+    });
   } catch (error) {
     console.error("Error in getPublicQuizById controller", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 }
 
@@ -185,7 +277,7 @@ export async function createPublicQuiz(req, res) {
           "publicStats.publicQuizzesPublished": 1,
           "publicStats.publicQuestionsPublished": publicQuiz.questions.length,
         },
-      }
+      },
     );
 
     res.status(201).json({
@@ -262,7 +354,7 @@ export async function publishPrivateQuiz(req, res) {
           "publicStats.publicQuizzesPublished": 1,
           "publicStats.publicQuestionsPublished": publicQuiz.questions.length,
         },
-      }
+      },
     );
 
     res.status(201).json({
@@ -345,7 +437,7 @@ export async function updatePublicQuiz(req, res) {
           $inc: {
             "publicStats.publicQuestionsPublished": questionCountDifference,
           },
-        }
+        },
       );
     }
 
@@ -385,7 +477,7 @@ export async function updatePublicQuizStatus(req, res) {
         authorEmail: userEmail,
       },
       { status },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!updatedQuiz) {
@@ -428,10 +520,9 @@ export async function deletePublicQuiz(req, res) {
       {
         $inc: {
           "publicStats.publicQuizzesPublished": -1,
-          "publicStats.publicQuestionsPublished":
-            -deletedQuiz.questions.length,
+          "publicStats.publicQuestionsPublished": -deletedQuiz.questions.length,
         },
-      }
+      },
     );
 
     res.status(200).json({

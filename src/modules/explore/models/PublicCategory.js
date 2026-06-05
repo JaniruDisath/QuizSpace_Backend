@@ -21,6 +21,24 @@ const publicCategorySchema = new mongoose.Schema(
       default: "primary",
     },
 
+    imageUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    imageAlt: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    imageCreditUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     isActive: {
       type: Boolean,
       default: true,

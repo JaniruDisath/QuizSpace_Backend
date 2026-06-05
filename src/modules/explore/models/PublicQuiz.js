@@ -4,8 +4,8 @@ const publicOptionSchema = new mongoose.Schema(
   {
     text: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
   },
   { _id: true },
@@ -15,25 +15,19 @@ const publicQuestionSchema = new mongoose.Schema(
   {
     questionText: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
 
     options: {
       type: [publicOptionSchema],
-      required: true,
-      validate: {
-        validator: function (options) {
-          return Array.isArray(options) && options.length >= 2;
-        },
-        message: "Each public question must have at least 2 options.",
-      },
+      default: [],
     },
 
     correctOptionIndex: {
       type: Number,
-      required: true,
       min: 0,
+      default: 0,
     },
 
     focusArea: {
@@ -44,8 +38,13 @@ const publicQuestionSchema = new mongoose.Schema(
 
     explanation: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
+    },
+
+    isLocked: {
+      type: Boolean,
+      default: false,
     },
   },
   { _id: true },
@@ -54,6 +53,7 @@ const publicQuestionSchema = new mongoose.Schema(
 publicQuestionSchema.pre("validate", function () {
   if (
     Array.isArray(this.options) &&
+    this.options.length > 0 &&
     this.correctOptionIndex >= this.options.length
   ) {
     this.invalidate(
@@ -65,6 +65,13 @@ publicQuestionSchema.pre("validate", function () {
 
 const publicQuizSchema = new mongoose.Schema(
   {
+    seedKey: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
+
     title: {
       type: String,
       required: true,
@@ -110,13 +117,7 @@ const publicQuizSchema = new mongoose.Schema(
 
     questions: {
       type: [publicQuestionSchema],
-      required: true,
-      validate: {
-        validator: function (questions) {
-          return Array.isArray(questions) && questions.length > 0;
-        },
-        message: "A public quiz must have at least one question.",
-      },
+      default: [],
     },
 
     pointsPerQuestion: {
@@ -128,7 +129,12 @@ const publicQuizSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["published", "hidden"],
-      default: "published",
+      default: "hidden",
+    },
+
+    publishedAt: {
+      type: Date,
+      default: null,
     },
 
     attemptCount: {
@@ -159,4 +165,8 @@ const publicQuizSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.model("PublicQuiz", publicQuizSchema);
+publicQuizSchema.index({ authorEmail: 1, status: 1 });
+publicQuizSchema.index({ categoryName: 1, difficulty: 1, status: 1 });
+
+export default mongoose.models.PublicQuiz ||
+  mongoose.model("PublicQuiz", publicQuizSchema);

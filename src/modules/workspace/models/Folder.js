@@ -2,6 +2,13 @@ import mongoose from "mongoose";
 
 const folderSchema = new mongoose.Schema(
   {
+    seedKey: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
+
     folderName: {
       type: String,
       required: true,
@@ -25,12 +32,11 @@ const folderSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-// This makes searching faster
 folderSchema.index({ userEmail: 1, parentFolderId: 1 });
-
+  
 const Folder = mongoose.model("Folder", folderSchema);
 
 export default Folder;

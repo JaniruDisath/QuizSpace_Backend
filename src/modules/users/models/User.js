@@ -41,6 +41,38 @@ const userSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+
+      publicStats: {
+        totalPoints: {
+          type: Number,
+          default: 0,
+        },
+
+        publicQuizzesAttempted: {
+          type: Number,
+          default: 0,
+        },
+
+        publicQuizzesPublished: {
+          type: Number,
+          default: 0,
+        },
+
+        publicQuestionsPublished: {
+          type: Number,
+          default: 0,
+        },
+
+        publicQuizAttemptsReceived: {
+          type: Number,
+          default: 0,
+        },
+
+        publicQuizParticipantsReached: {
+          type: Number,
+          default: 0,
+        },
+      },
     },
   },
   {

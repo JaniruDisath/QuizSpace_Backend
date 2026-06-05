@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const publicAttemptAnswerSchema = new mongoose.Schema(
+const publicAttemptEventAnswerSchema = new mongoose.Schema(
   {
     questionId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -28,20 +28,14 @@ const publicAttemptAnswerSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+      default: 0,
     },
   },
-  { _id: false },
+  { _id: false }
 );
 
-const publicQuizAttemptSchema = new mongoose.Schema(
+const publicQuizAttemptEventSchema = new mongoose.Schema(
   {
-    seedKey: {
-      type: String,
-      trim: true,
-      unique: true,
-      sparse: true,
-    },
-
     publicQuizId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "PublicQuiz",
@@ -92,40 +86,23 @@ const publicQuizAttemptSchema = new mongoose.Schema(
       default: 1,
     },
 
-    totalDurationSeconds: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0,
-    },
-
-    attemptCount: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
-
     answers: {
-      type: [publicAttemptAnswerSchema],
+      type: [publicAttemptEventAnswerSchema],
       default: [],
     },
 
-    bestAttemptAt: {
-      type: Date,
-      default: Date.now,
-    },
-
-    lastAttemptAt: {
+    attemptedAt: {
       type: Date,
       default: Date.now,
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
-publicQuizAttemptSchema.index(
-  { publicQuizId: 1, userEmail: 1 },
-  { unique: true },
-);
+publicQuizAttemptEventSchema.index({ publicQuizId: 1, attemptedAt: -1 });
+publicQuizAttemptEventSchema.index({ userEmail: 1, attemptedAt: -1 });
 
-export default mongoose.model("PublicQuizAttempt", publicQuizAttemptSchema);
+export default mongoose.model(
+  "PublicQuizAttemptEvent",
+  publicQuizAttemptEventSchema
+);

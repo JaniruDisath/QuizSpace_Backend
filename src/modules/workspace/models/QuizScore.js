@@ -22,11 +22,18 @@ const answerSchema = new mongoose.Schema(
       required: true,
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const quizScoreSchema = new mongoose.Schema(
   {
+    seedKey: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
+
     quizId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Quiz",
@@ -63,7 +70,7 @@ const quizScoreSchema = new mongoose.Schema(
       default: [],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model("QuizScore", quizScoreSchema);
